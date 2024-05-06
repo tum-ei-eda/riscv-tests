@@ -35,6 +35,12 @@ RVTEST_CODE_BEGIN
   TEST_IMM_OP( 15, srai, 0xfffffffffffe0606, 0xffffffff81818181, 14 );
   TEST_IMM_OP( 16, srai, 0xffffffffffffffff, 0xffffffff81818181, 31 );
 
+#if __riscv_xlen == 64
+  TEST_IMM_OP( 50, srai, 0xffffffffffffffff, 0x8000000000000000, 63 );
+  TEST_IMM_OP( 51, srai, 0xffffffffffffff00, 0xffff800000000000, 39 );
+  TEST_IMM_OP( 52, srai, 0x0000000000012121, 0x0909080000000000, 43 );
+#endif
+
   #-------------------------------------------------------------
   # Source/Destination tests
   #-------------------------------------------------------------
