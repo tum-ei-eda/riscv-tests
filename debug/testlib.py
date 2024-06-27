@@ -134,6 +134,9 @@ class Spike:
         else:
             isa = f"RV{self.harts[0].xlen}G"
 
+        if 'V' in isa[2:]:
+            isa += f"_Zvl{self.vlen}b_Zve{self.elen}d"
+
         cmd += ["--isa", isa]
         cmd += ["--dm-auth"]
 
@@ -159,8 +162,6 @@ class Spike:
         if not self.support_haltgroups:
             cmd.append("--dm-no-halt-groups")
 
-        if 'V' in isa[2:]:
-            cmd.append(f"--varch=vlen:{self.vlen},elen:{self.elen}")
 
         assert len(set(t.ram for t in self.harts)) == 1, \
                 "All spike harts must have the same RAM layout"
@@ -367,10 +368,15 @@ class Openocd:
         self.tclrpc_port = None
         self.start(cmd, logfile, extra_env)
 
-        self.openocd_cli = pexpect.spawn(f"nc localhost {self.tclrpc_port}")
+        self.openocd_cli = pexpect.spawn(f"nc localhost {self.tclrpc_port}",
+            echo=False)
         # TCL-RPC uses \x1a as a watermark for end of message. We set raw
         # pty mode to disable translation of \x1a to EOF
         tty.setraw(self.openocd_cli.child_fd)
+        hello_string = self.command(
+            "capture { echo \"Hello TCL-RPC!\" }").decode()
+        if not "Hello TCL-RPC!" in hello_string:
+            raise RuntimeError(f"TCL-RPC - unexpected reply:\n{hello_string}")
 
     def start(self, cmd, logfile, extra_env):
         combined_env = {**os.environ, **extra_env}
