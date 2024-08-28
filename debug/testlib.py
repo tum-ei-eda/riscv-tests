@@ -1,6 +1,7 @@
 import collections
 import os
 import os.path
+import random
 import re
 import shlex
 import subprocess
@@ -8,6 +9,8 @@ import sys
 import tempfile
 import time
 import traceback
+
+from datetime import datetime
 
 import tty
 import pexpect
@@ -134,6 +137,9 @@ class Spike:
         else:
             isa = f"RV{self.harts[0].xlen}G"
 
+        if 'V' in isa[2:]:
+            isa += f"_Zvl{self.vlen}b_Zve{self.elen}d"
+
         cmd += ["--isa", isa]
         cmd += ["--dm-auth"]
 
@@ -159,8 +165,6 @@ class Spike:
         if not self.support_haltgroups:
             cmd.append("--dm-no-halt-groups")
 
-        if 'V' in isa[2:]:
-            cmd.append(f"--varch=vlen:{self.vlen},elen:{self.elen}")
 
         assert len(set(t.ram for t in self.harts)) == 1, \
                 "All spike harts must have the same RAM layout"
@@ -367,10 +371,15 @@ class Openocd:
         self.tclrpc_port = None
         self.start(cmd, logfile, extra_env)
 
-        self.openocd_cli = pexpect.spawn(f"nc localhost {self.tclrpc_port}")
+        self.openocd_cli = pexpect.spawn(f"nc localhost {self.tclrpc_port}",
+            echo=False)
         # TCL-RPC uses \x1a as a watermark for end of message. We set raw
         # pty mode to disable translation of \x1a to EOF
         tty.setraw(self.openocd_cli.child_fd)
+        hello_string = self.command(
+            "capture { echo \"Hello TCL-RPC!\" }").decode()
+        if not "Hello TCL-RPC!" in hello_string:
+            raise RuntimeError(f"TCL-RPC - unexpected reply:\n{hello_string}")
 
     def start(self, cmd, logfile, extra_env):
         combined_env = {**os.environ, **extra_env}
@@ -1155,6 +1164,14 @@ def run_all_tests(module, target, parsed):
     excluded_tests = load_excluded_tests(parsed.exclude_tests, target.name)
     target.skip_tests += excluded_tests
 
+    # initialize PRNG
+    selected_seed = parsed.seed
+    if parsed.seed is None:
+        selected_seed = int(datetime.now().timestamp())
+        print(f"PRNG seed for {target.name} is generated automatically")
+    print(f"PRNG seed for {target.name} is {selected_seed}")
+    random.seed(selected_seed)
+
     results, count = run_tests(parsed, target, todo)
 
     header(f"ran {count} tests in {time.time() - overall_start:.0f}s", dash=':')
@@ -1287,7 +1304,6 @@ class BaseTest:
         if not hart is None:
             self.hart = hart
         else:
-            import random   # pylint: disable=import-outside-toplevel
             self.hart = random.choice(target.harts)
             #self.hart = target.harts[-1]
         self.server = None
