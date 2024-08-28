@@ -15,7 +15,7 @@ RVTEST_CODE_BEGIN
 
 #define TEST_FP_OP2_S_RM( testnum, inst, rm, flags, result, val1, val2 ) \
   TEST_FP_OP_S_INTERNAL( testnum, flags, float result, val1, val2, 0.0, \
-                    inst f3, f0, f1, rm; fmv.x.s a0, f3)
+                    inst f13, f10, f11, rm; fmv.x.s a0, f13)
 
   #-------------------------------------------------------------
   # Arithmetic tests
