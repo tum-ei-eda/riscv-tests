@@ -11,7 +11,6 @@ import os
 import re
 import itertools
 
-from datetime import datetime
 import targets
 import testlib
 from testlib import assertEqual, assertNotEqual
@@ -2126,8 +2125,10 @@ class EtriggerTest(DebugTest):
     def test(self):
         # Set trigger on Load access fault
         self.gdb.command("monitor riscv etrigger set m 0x20")
-        # Set fox to a null pointer so we'll get a load access exception later.
-        self.gdb.p("fox=(char*)0")
+        # Set fox to a bad pointer so we'll get a load access exception later.
+        # Use NULL if a known-bad address is not provided.
+        bad_address = self.hart.bad_address or 0
+        self.gdb.p(f"fox=(char*)0x{bad_address:08x}")
         output = self.gdb.c()
         # We should not be at handle_trap
         assertNotIn("handle_trap", output)
@@ -2212,14 +2213,6 @@ def main():
     testlib.print_log_names = parsed.print_log_names
 
     module = sys.modules[__name__]
-
-    # initialize PRNG
-    selected_seed = parsed.seed
-    if parsed.seed is None:
-        selected_seed = int(datetime.now().timestamp())
-        print(f"PRNG seed for {target.name} is generated automatically")
-    print(f"PRNG seed for {target.name} is {selected_seed}")
-    random.seed(selected_seed)
 
     return testlib.run_all_tests(module, target, parsed)
 
